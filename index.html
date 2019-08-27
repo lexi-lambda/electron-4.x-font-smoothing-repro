@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Electron 4.2.9</title>
+    <link href="tt.css" rel="stylesheet">
+  </head>
+  <body>
+    <pre>main :: IO ()
+main = withSigTermHandler $
+  forever (threadDelay maxBound) `catchOnce` \(exn :: ShutdownRequest) -&gt; do
+    let n = 5
+    putStrLn $ "Received shutdown request " &lt;&gt; show exn
+      &lt;&gt; ". Waiting " &lt;&gt; show n &lt;&gt; " seconds..."
+    threadDelay (n * 1000 * 1000)
+    putStrLn "...shutting down."
+    throwIO exn
+
+-- | The exception raised by 'withSigTermHandler' on each received @SIGTERM@ signal.
+data TerminateRequest = TerminateRequest
+  deriving (Show, Eq)
+
+instance Exception TerminateRequest where
+  toException = asyncExceptionToException
+  fromException = asyncExceptionFromException
+
+-- | A sum exception of 'UserInterrupt' and 'TerminateRequest'.
+data ShutdownRequest = SRInterrupt | SRTerminate
+  deriving (Show, Eq)
+
+instance Exception ShutdownRequest where
+  toException = \case
+    SRInterrupt -&gt; toException UserInterrupt
+    SRTerminate -&gt; toException TerminateRequest
+
+  fromException exn =
+    (guardExn UserInterrupt $&gt; SRInterrupt) &lt;|&gt; (guardExn TerminateRequest $&gt; SRTerminate)
+    where
+      guardExn :: (Exception e, Eq e) =&gt; e -&gt; Maybe ()
+      guardExn expectedExn = do
+        actualExn &lt;- fromException exn
+        guard (actualExn == expectedExn)</pre>
+  </body>
+</html>
